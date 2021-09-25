@@ -75,4 +75,4 @@ print(df)
 df = df[:100]
 df.plot(kind = 'bar')
 plt.show()
-
+plt.savefig('BillboardGraph.png')
