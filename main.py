@@ -1,12 +1,13 @@
-from typing import Final
+from time import sleep
 from bs4 import BeautifulSoup as bs
+from pandas.core.frame import DataFrame
 import requests
 from idsecret import Token, URLS
 import lyricsgenius as lg
 import os
 import matplotlib.pyplot as plt
-from matplotlib import pyplot
-import pandas as np
+import pandas as pd
+import os
 
 token = Token()
 urls = URLS()
@@ -17,16 +18,7 @@ remove_section_headers = True
 genius = lg.Genius(token.getAccessToken(), skip_non_songs=skip_non_songs, excluded_terms=exclude_terms, remove_section_headers=remove_section_headers)
     
 
-def writeLyrics(chart_map):
-    for artist in chart_map:
-        if artist is None:
-            break
-        with open(os.path.join(urls.getLyricsFolder(), str(artist + '.txt')), 'w') as f:
-            song = genius.search_song(title= chart_map[artist], artist=artist).lyrics
-            f.write(song)
-        f.close()
-
-def getSongs():
+def getSongs() -> dict:
     hot_page = requests.get(urls.getTopUrl())
     hot_page_content = hot_page.content
     soup = bs(hot_page_content, 'html.parser')
@@ -36,43 +28,57 @@ def getSongs():
     for i in chart_table:
         artist = i.find_next('span',class_= 'chart-element__information').find_next('span', class_ = 'chart-element__information__song text--truncate color--primary').contents
         song = i.find_next('span',class_= 'chart-element__information').find_next('span', class_ = 'chart-element__information__artist text--truncate color--secondary').contents
-        # print(artist, song)
         chart_map[artist.pop(0)] = song.pop(0)
-
-    # for entry in chart_map:
-    #     print(chart_map[entry],':' ,entry)
 
     return chart_map
 
-words = {}
-count = 0
-some_list = os.listdir(urls.getLyricsFolder())
-unwanted_cahrs = '.,-()"'
-for song in some_list:
-    with open(os.path.join(urls.getLyricsFolder(),song), 'r') as f:
-        data = f.read()
-        text = data.split()
-        for raw_word in text:
-            word = raw_word.strip(unwanted_cahrs).lower()
-            if word.isalnum() and len(word)>2 and word is not None:
-                if word not in words:
-                    words[word] = 0
-                else:
-                    words[word] += 1
-    f.close()
+# Recives a map of [artist]song type and finds lyrics for all available songs in the genius API
+def writeLyrics(chart_map):
+    for artist in chart_map:
+        if artist is None:
+            break
+        with open(os.path.join(urls.getLyricsFolder(), str(artist + '.txt')), 'w') as f:
+            song = genius.search_song(title= chart_map[artist], artist=artist).lyrics
+            f.write(song)
+        f.close()
 
-names = list(words.keys())
-values = list(words.values())
+# Recives a folder with the lyrics text files (Test needed) and maps the number of occurrences in these files 
+# And then
+# Recives a map of type [word]occurrences and plots the data via bar diagram
+# tol is how many words to display on the graph
+def printDataBar(tol = 100, printData = True)-> DataFrame:
+    words = {}
+    lyrics_files = os.listdir(urls.getLyricsFolder())
+    unwanted_chars = '.,-()"'
+    for song in lyrics_files:
+        with open(os.path.join(urls.getLyricsFolder(),song), 'r') as f:
+            data = f.read()
+            text = data.split()
+            for raw_word in text:
+                word = raw_word.strip(unwanted_chars).lower()
+                if word.isalnum() and len(word)>2 and word is not None and word not in urls.toIgnore():
+                    if word not in words:
+                        words[word] = 0
+                    else:
+                        words[word] += 1
+        f.close()
+    df = pd.Series(words).to_frame('count')
+    df = df.sort_values(by=['count'], ascending=False)
+    df = df[df['count']>10]
+    pd.set_option('display.max_rows', df.shape[0]+1)
+    if printData is True:
+        df = df[:tol]
+        df.plot(kind = 'bar')
+        plt.show()
+    else:
+        print(df)
+
+    return df
+
+if __name__ == "__main__":
+    songs = getSongs() # Gets the song
+    writeLyrics(songs) # Gets the lyrics for each song
+    printDataBar() # Prints the bar graph
+    printDataBar(printData=False) # Prints the DataFrame
 
 
-df = np.Series(words).to_frame('count')
-df = df.sort_values(by=['count'], ascending=False)
-df = df[df['count']>10]
-np.set_option('display.max_rows', df.shape[0]+1)
-
-print(df)
-
-df = df[:100]
-df.plot(kind = 'bar')
-plt.show()
-plt.savefig('BillboardGraph.png')
