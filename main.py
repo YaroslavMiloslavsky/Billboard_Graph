@@ -1,4 +1,3 @@
-from time import sleep
 from bs4 import BeautifulSoup as bs
 from pandas.core.frame import DataFrame
 import requests
@@ -7,7 +6,6 @@ import lyricsgenius as lg
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
 
 token = Token()
 urls = URLS()
